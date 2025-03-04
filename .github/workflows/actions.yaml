@@ -1,0 +1,42 @@
+name: Build, Push, and Deploy
+
+on:
+  push:
+    branches: ['master']
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+
+    - name: Login to GitHub Container Registry
+      env:
+        CR_PAT_SECRET: ${{ secrets.CR_PAT }}
+      run: echo $CR_PAT_SECRET | docker login ghcr.io -u ${{ secrets.CR_PAT_USERNAME }} --password-stdin
+
+    - name: Set image tags
+      id: vars
+      run: |
+        echo "commit_sha=$(echo $GITHUB_SHA | head -c 8)" >> $GITHUB_ENV
+
+
+    - name: Set Docker Tags
+      id: docker-metadata
+      uses: docker/metadata-action@v4
+      with:
+        images: |
+          ghcr.io/devEdexa/${{ github.event.repository.name }}-${{ github.ref_name }}
+        tags: |
+          ${{ env.commit_sha }}
+
+    - name: Build and Push Docker Image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.docker-metadata.outputs.tags }}
+        labels: ${{ steps.docker-metadata.outputs.labels }}
